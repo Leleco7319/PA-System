@@ -22,6 +22,7 @@ export interface IAudioJSON {
   tamanho: number
   duracao?: number
   checksum: string
+  temporario?: boolean
   createdAt: string
 }
 
@@ -75,6 +76,7 @@ export interface IAudio {
   tamanho: number
   duracao?: number
   checksum: string
+  temporario?: boolean
   createdAt: Date
 }
 

@@ -15,9 +15,11 @@ export default function OnDemandPage() {
   const [grupos, setGrupos] = useState<IGrupoJSON[]>([])
 
   const [audioId, setAudioId] = useState('')
+  const [gravacaoLabel, setGravacaoLabel] = useState('')
   const [nosIds, setNosIds] = useState<string[]>([])
   const [gruposIds, setGruposIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploadingGravacao, setUploadingGravacao] = useState(false)
   const [resultados, setResultados] = useState<Resultado[] | null>(null)
   const [error, setError] = useState('')
 
@@ -30,7 +32,7 @@ export default function OnDemandPage() {
   }, [])
 
   async function handleTransmitir() {
-    if (!audioId) { setError('Selecione um áudio'); return }
+    if (!audioId) { setError('Selecione ou grave um áudio'); return }
     if (nosIds.length === 0 && gruposIds.length === 0) { setError('Selecione ao menos um nó ou grupo'); return }
     setLoading(true)
     setError('')
@@ -44,6 +46,11 @@ export default function OnDemandPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Erro ao transmitir')
       setResultados(data.resultados)
+      // Clear recording state after transmitting (it was deleted from server)
+      if (gravacaoLabel) {
+        setAudioId('')
+        setGravacaoLabel('')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao transmitir')
     } finally {
@@ -58,36 +65,52 @@ export default function OnDemandPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
           <h2 className="font-semibold text-gray-700">Selecionar Áudio</h2>
           <select
-            value={audioId}
-            onChange={(e) => setAudioId(e.target.value)}
+            value={gravacaoLabel ? '' : audioId}
+            onChange={(e) => { setAudioId(e.target.value); setGravacaoLabel('') }}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={!!gravacaoLabel}
           >
-            <option value="">Escolha um áudio…</option>
+            <option value="">Escolha um áudio da biblioteca…</option>
             {audios.map((a) => (
               <option key={a._id} value={a._id}>{a.nome}</option>
             ))}
           </select>
 
+          {gravacaoLabel && (
+            <div className="flex items-center justify-between rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
+              <span>{gravacaoLabel}</span>
+              <button
+                onClick={() => { setAudioId(''); setGravacaoLabel('') }}
+                className="text-green-500 hover:text-green-700 font-medium"
+              >
+                Remover
+              </button>
+            </div>
+          )}
+
           <div className="border-t border-gray-100 pt-4">
             <GravacaoAudio
-              onGravado={(file) => {
-                // Upload automático da gravação
+              onGravado={async (file) => {
+                setError('')
+                setUploadingGravacao(true)
                 const form = new FormData()
                 form.append('arquivo', file)
-                form.append('nome', `Gravação ${new Date().toLocaleString('pt-BR')}`)
-                fetch('/api/audios', { method: 'POST', body: form })
-                  .then(async r => {
-                    const data = await r.json()
-                    if (!r.ok) throw new Error(data.error ?? 'Erro ao salvar gravação')
-                    return data
-                  })
-                  .then(audio => {
-                    setAudios(prev => [audio, ...prev])
-                    setAudioId(audio._id)
-                  })
-                  .catch(err => alert(err.message))
+                try {
+                  const r = await fetch('/api/on-demand/upload', { method: 'POST', body: form })
+                  const data = await r.json()
+                  if (!r.ok) throw new Error(data.error ?? 'Erro ao processar gravação')
+                  setAudioId(data.audioId)
+                  setGravacaoLabel(`Gravação ${new Date().toLocaleString('pt-BR')}`)
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Erro ao processar gravação')
+                } finally {
+                  setUploadingGravacao(false)
+                }
               }}
             />
+            {uploadingGravacao && (
+              <p className="mt-2 text-xs text-gray-500">Processando gravação…</p>
+            )}
           </div>
         </div>
 

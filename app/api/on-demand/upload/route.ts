@@ -13,7 +13,6 @@ import ffmpegStatic from 'ffmpeg-static'
 
 ffmpeg.setFfmpegPath(ffmpegStatic as string)
 
-const MAX_SIZE_MB = parseInt(process.env.MAX_UPLOAD_SIZE_MB ?? '50')
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads')
 
 function converterParaMp3(inputPath: string, outputPath: string): Promise<void> {
@@ -28,35 +27,17 @@ function converterParaMp3(inputPath: string, outputPath: string): Promise<void> 
   })
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-
-  await connectDB()
-  const audios = await AudioModel.find({ temporario: { $ne: true } }).sort({ createdAt: -1 }).lean()
-  return NextResponse.json(audios)
-}
-
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const formData = await request.formData()
   const arquivo = formData.get('arquivo') as File | null
-  const nome = formData.get('nome') as string | null
-  const temporario = formData.get('temporario') === 'true'
-
   if (!arquivo) return NextResponse.json({ error: 'Arquivo não enviado' }, { status: 400 })
-  if (!nome?.trim()) return NextResponse.json({ error: 'Nome obrigatório' }, { status: 400 })
 
   const ext = arquivo.name.split('.').pop()?.toLowerCase()
   if (!['mp3', 'wav', 'webm'].includes(ext ?? '')) {
     return NextResponse.json({ error: 'Formatos aceitos: .mp3, .wav, .webm' }, { status: 400 })
-  }
-
-  const sizeMB = arquivo.size / (1024 * 1024)
-  if (sizeMB > MAX_SIZE_MB) {
-    return NextResponse.json({ error: `Arquivo excede ${MAX_SIZE_MB} MB` }, { status: 400 })
   }
 
   try {
@@ -83,20 +64,20 @@ export async function POST(request: NextRequest) {
     }
 
     const checksum = crypto.createHash('md5').update(finalBuffer).digest('hex')
-    const nomeArquivo = `${uuidv4()}.${finalExt}`
-
+    const nomeArquivo = `tmp-${uuidv4()}.${finalExt}`
     await writeFile(path.join(UPLOAD_DIR, nomeArquivo), finalBuffer)
 
+    // Save to DB as temporario — invisible in the library, deleted right after play
     await connectDB()
     const audio = await AudioModel.create({
-      nome: nome.trim(),
+      nome: `on-demand-${Date.now()}`,
       nomeArquivo,
       tamanho: finalBuffer.length,
       checksum,
-      temporario,
+      temporario: true,
     })
 
-    return NextResponse.json(audio, { status: 201 })
+    return NextResponse.json({ audioId: String(audio._id) }, { status: 201 })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro interno'
     return NextResponse.json({ error: message }, { status: 500 })

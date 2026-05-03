@@ -8,6 +8,7 @@ const AudioSchema = new Schema<IAudio>(
     tamanho: { type: Number, required: true },
     duracao: { type: Number },
     checksum: { type: String, required: true },
+    temporario: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 )

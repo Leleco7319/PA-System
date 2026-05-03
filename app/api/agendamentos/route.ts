@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { connectDB } from '@/lib/db'
 import AgendamentoModel from '@/models/Agendamento'
+import { resolveNodeIds, syncNodeSchedules } from '@/lib/scheduleSync'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -41,6 +42,11 @@ export async function POST(request: NextRequest) {
     cron: recorrente ? cron : undefined,
     status: 'pendente',
   })
+
+  // Sync schedules to all targeted nodes (fire-and-forget; errors are logged)
+  resolveNodeIds(nosIds, gruposIds)
+    .then(nodeIds => syncNodeSchedules(nodeIds))
+    .catch(err => console.error('[agendamentos] sync error:', err))
 
   return NextResponse.json(agendamento, { status: 201 })
 }
