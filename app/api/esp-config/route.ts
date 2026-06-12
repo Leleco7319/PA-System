@@ -11,15 +11,14 @@ export const POST = handleRoute(async (request: NextRequest) => {
 
   const parsed = await parseBody(request, espConfigSchema)
   if (parsed.error) return parsed.error
-  const { ip, port, wifiSSID, wifiPassword, hostname, volume, mqttBroker, mqttPort, apiToken } = parsed.data
+  const { ip, port, wifiSSID, wifiPassword, hostname, volume, ServerURL, apiToken } = parsed.data
 
   const payload = JSON.stringify({
     wifiSSID,
     wifiPassword,
     hostname,
     volume,
-    mqttBroker,
-    mqttPort,
+    ServerURL,
     apiToken,
   })
 

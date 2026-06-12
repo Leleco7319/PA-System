@@ -96,8 +96,7 @@ export const espConfigSchema = z.object({
   wifiPassword: z.string().default(''),
   hostname: z.string().default(''),
   volume: z.coerce.number().int().min(0, 'Volume inválido (0–100)').max(100, 'Volume inválido (0–100)'),
-  mqttBroker: z.string().default(''),
-  mqttPort: z.coerce.number().int().min(1, 'Porta MQTT inválida (1–65535)').max(65535, 'Porta MQTT inválida (1–65535)'),
+  ServerURL: z.string().default(''),
   apiToken: z.string().default(''),
 })
 
