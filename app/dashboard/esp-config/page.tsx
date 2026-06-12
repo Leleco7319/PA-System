@@ -20,11 +20,11 @@ interface EspConfig {
 const DEFAULT_CONFIG: EspConfig = {
   ip: '',
   port: '5005',
-  wifiSSID: 'VIVO LECO',
-  wifiPassword: 'Piriquito120203',
-  hostname: 'alarm-1',
+  wifiSSID: '',
+  wifiPassword: '',
+  hostname: '',
   volume: '10',
-  mqttBroker: '192.168.1.100',
+  mqttBroker: '',
   mqttPort: '1883',
   apiToken: '',
 }
@@ -127,12 +127,14 @@ export default function EspConfigPage() {
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="SSID"
+                placeholder="Nome da rede Wi-Fi"
                 value={config.wifiSSID}
                 onChange={handleChange('wifiSSID')}
               />
               <Input
                 label="Senha"
                 type="password"
+                placeholder="Senha da rede Wi-Fi"
                 value={config.wifiPassword}
                 onChange={handleChange('wifiPassword')}
               />
@@ -145,6 +147,7 @@ export default function EspConfigPage() {
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Hostname"
+                placeholder="alarm-1"
                 value={config.hostname}
                 onChange={handleChange('hostname')}
               />
@@ -165,6 +168,7 @@ export default function EspConfigPage() {
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Broker IP"
+                placeholder="192.168.1.x"
                 value={config.mqttBroker}
                 onChange={handleChange('mqttBroker')}
               />
