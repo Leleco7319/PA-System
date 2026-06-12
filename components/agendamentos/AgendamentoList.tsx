@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import Modal from '@/components/ui/Modal'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import Spinner from '@/components/ui/Spinner'
 import { formatDateTime } from '@/lib/utils'
 import type { IAgendamentoJSON, AgendamentoStatus } from '@/types'
@@ -96,19 +96,14 @@ export default function AgendamentoList({ agendamentos, loading, onDelete }: Age
         })}
       </div>
 
-      <Modal
+      <ConfirmModal
         open={!!confirmId}
-        onClose={() => setConfirmId(null)}
         title="Remover agendamento"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirmId(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={handleDelete} loading={deleting}>Remover</Button>
-          </>
-        }
-      >
-        <p className="text-gray-600">Tem certeza que deseja remover este agendamento?</p>
-      </Modal>
+        message="Tem certeza que deseja remover este agendamento?"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmId(null)}
+      />
     </>
   )
 }

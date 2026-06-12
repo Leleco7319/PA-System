@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import Modal from '@/components/ui/Modal'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import Badge from '@/components/ui/Badge'
 import type { IGrupoJSON, INoJSON } from '@/types'
 
@@ -21,6 +22,8 @@ export default function GrupoManager({ grupos, nos, onRefresh }: GrupoManagerPro
   const [nosIds, setNosIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   function abrirCriar() {
     setEditando(null)
@@ -68,9 +71,12 @@ export default function GrupoManager({ grupos, nos, onRefresh }: GrupoManagerPro
     }
   }
 
-  async function handleDeletar(id: string) {
-    if (!confirm('Remover este grupo?')) return
-    await fetch(`/api/grupos/${id}`, { method: 'DELETE' })
+  async function handleDeletar() {
+    if (!confirmId) return
+    setDeleting(true)
+    await fetch(`/api/grupos/${confirmId}`, { method: 'DELETE' })
+    setDeleting(false)
+    setConfirmId(null)
     onRefresh()
   }
 
@@ -98,7 +104,7 @@ export default function GrupoManager({ grupos, nos, onRefresh }: GrupoManagerPro
                   variant="ghost"
                   size="sm"
                   className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => handleDeletar(g._id)}
+                  onClick={() => setConfirmId(g._id)}
                 >
                   Remover
                 </Button>
@@ -146,6 +152,15 @@ export default function GrupoManager({ grupos, nos, onRefresh }: GrupoManagerPro
           {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmId}
+        title="Remover grupo"
+        message="Tem certeza que deseja remover este grupo?"
+        loading={deleting}
+        onConfirm={handleDeletar}
+        onCancel={() => setConfirmId(null)}
+      />
     </div>
   )
 }

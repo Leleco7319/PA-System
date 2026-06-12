@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import NoCard from './NoCard'
 import Spinner from '@/components/ui/Spinner'
-import Modal from '@/components/ui/Modal'
-import Button from '@/components/ui/Button'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import type { INoJSON } from '@/types'
 
 interface NoListProps {
@@ -61,19 +60,14 @@ export default function NoList({ nos, loading, onDelete, onSincronizar }: NoList
         ))}
       </div>
 
-      <Modal
+      <ConfirmModal
         open={!!confirmId}
-        onClose={() => setConfirmId(null)}
         title="Remover nó"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirmId(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={handleDelete} loading={deleting}>Remover</Button>
-          </>
-        }
-      >
-        <p className="text-gray-600">Tem certeza que deseja remover este nó?</p>
-      </Modal>
+        message="Tem certeza que deseja remover este nó?"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmId(null)}
+      />
     </>
   )
 }

@@ -1,31 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import Header from '@/components/layout/Header'
 import AudioUploadForm from '@/components/audios/AudioUploadForm'
 import AudioList from '@/components/audios/AudioList'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
+import ErrorBanner from '@/components/ui/ErrorBanner'
+import useApiList from '@/hooks/useApiList'
 import type { IAudioJSON } from '@/types'
 
 export default function AudiosPage() {
-  const [audios, setAudios] = useState<IAudioJSON[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: audios, loading, error, refetch } = useApiList<IAudioJSON>('/api/audios')
   const [uploadOpen, setUploadOpen] = useState(false)
-
-  const fetchAudios = useCallback(async () => {
-    setLoading(true)
-    const res = await fetch('/api/audios')
-    const data = await res.json()
-    setAudios(data)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { fetchAudios() }, [fetchAudios])
 
   async function handleDelete(id: string) {
     await fetch(`/api/audios/${id}`, { method: 'DELETE' })
-    await fetchAudios()
+    await refetch()
   }
 
   return (
@@ -42,6 +33,8 @@ export default function AudiosPage() {
           </Button>
         </div>
 
+        {error && <ErrorBanner message={`Erro ao carregar áudios: ${error}`} />}
+
         <AudioList audios={audios} loading={loading} onDelete={handleDelete} />
       </div>
 
@@ -49,7 +42,7 @@ export default function AudiosPage() {
         <AudioUploadForm
           onSuccess={() => {
             setUploadOpen(false)
-            fetchAudios()
+            refetch()
           }}
         />
       </Modal>

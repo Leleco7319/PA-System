@@ -1,8 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import ErrorBanner from '@/components/ui/ErrorBanner'
+import SeletorNos from '@/components/on-demand/SeletorNos'
+import useApiList from '@/hooks/useApiList'
+import { gerarCron } from '@/lib/utils'
 import type { IAudioJSON, INoJSON, IGrupoJSON } from '@/types'
 
 const DIAS_SEMANA = [
@@ -15,20 +19,15 @@ const DIAS_SEMANA = [
   { label: 'Sáb', value: 6 },
 ]
 
-function gerarCron(diasSelecionados: number[], horario: string): string {
-  const [hh, mm] = horario.split(':')
-  const dias = diasSelecionados.length === 7 ? '*' : diasSelecionados.sort((a, b) => a - b).join(',')
-  return `${mm ?? '0'} ${hh ?? '0'} * * ${dias}`
-}
-
 interface AgendamentoFormProps {
   onSuccess: () => void
 }
 
 export default function AgendamentoForm({ onSuccess }: AgendamentoFormProps) {
-  const [audios, setAudios] = useState<IAudioJSON[]>([])
-  const [nos, setNos] = useState<INoJSON[]>([])
-  const [grupos, setGrupos] = useState<IGrupoJSON[]>([])
+  const { data: audios, error: audiosError } = useApiList<IAudioJSON>('/api/audios')
+  const { data: nos, error: nosError } = useApiList<INoJSON>('/api/nos')
+  const { data: grupos, error: gruposError } = useApiList<IGrupoJSON>('/api/grupos')
+  const fetchError = audiosError ?? nosError ?? gruposError
 
   const [audioId, setAudioId] = useState('')
   const [nosIds, setNosIds] = useState<string[]>([])
@@ -39,22 +38,6 @@ export default function AgendamentoForm({ onSuccess }: AgendamentoFormProps) {
   const [horario, setHorario] = useState('08:00')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/audios').then((r) => r.json()),
-      fetch('/api/nos').then((r) => r.json()),
-      fetch('/api/grupos').then((r) => r.json()),
-    ]).then(([a, n, g]) => {
-      setAudios(a)
-      setNos(n)
-      setGrupos(g)
-    })
-  }, [])
-
-  function toggleSelection(id: string, selected: string[], setSelected: (v: string[]) => void) {
-    setSelected(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
-  }
 
   function toggleDia(valor: number) {
     setDiasSelecionados((prev) =>
@@ -69,7 +52,7 @@ export default function AgendamentoForm({ onSuccess }: AgendamentoFormProps) {
     if (recorrente && diasSelecionados.length === 0) { setError('Selecione ao menos um dia da semana'); return }
     if (nosIds.length === 0 && gruposIds.length === 0) { setError('Selecione ao menos um nó ou grupo'); return }
 
-    const cron = recorrente ? gerarCron(diasSelecionados, horario) : undefined
+    const cron = recorrente ? gerarCron(diasSelecionados, horario) ?? undefined : undefined
     const dataHoraFinal = recorrente
       ? (() => {
           const [hh, mm] = horario.split(':')
@@ -107,6 +90,8 @@ export default function AgendamentoForm({ onSuccess }: AgendamentoFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {fetchError && <ErrorBanner message={`Erro ao carregar dados: ${fetchError}`} />}
+
       {/* Áudio */}
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-700">Áudio</label>
@@ -198,45 +183,18 @@ export default function AgendamentoForm({ onSuccess }: AgendamentoFormProps) {
         </div>
       )}
 
-      {/* Nós */}
-      {nos.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Nós</label>
-          <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-            {nos.map((no) => (
-              <label key={no._id} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={nosIds.includes(no._id)}
-                  onChange={() => toggleSelection(no._id, nosIds, setNosIds)}
-                  className="rounded"
-                />
-                <span className={no.online ? 'text-gray-900' : 'text-gray-400'}>{no.nome}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Grupos */}
-      {grupos.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Grupos</label>
-          <div className="grid grid-cols-2 gap-2">
-            {grupos.map((g) => (
-              <label key={g._id} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={gruposIds.includes(g._id)}
-                  onChange={() => toggleSelection(g._id, gruposIds, setGruposIds)}
-                  className="rounded"
-                />
-                {g.nome}
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Destinos (nós e grupos) */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-gray-700">Destinos</label>
+        <SeletorNos
+          nos={nos}
+          grupos={grupos}
+          nosIds={nosIds}
+          gruposIds={gruposIds}
+          onChangeNos={setNosIds}
+          onChangeGrupos={setGruposIds}
+        />
+      </div>
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
