@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { connectDB } from '@/lib/db'
 import AgendamentoModel from '@/models/Agendamento'
 import { resolveNodeIds, syncNodeSchedules } from '@/lib/scheduleSync'
+import { apiError, handleRoute, parseBody, requireSession } from '@/lib/api-utils'
+import { agendamentoCreateSchema } from '@/lib/validators'
 
-export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+export const GET = handleRoute(async () => {
+  const session = await requireSession()
+  if (!session) return apiError('Não autorizado', 401)
 
   await connectDB()
   const agendamentos = await AgendamentoModel.find()
@@ -17,20 +17,15 @@ export async function GET() {
     .sort({ dataHora: -1 })
     .lean()
   return NextResponse.json(agendamentos)
-}
+})
 
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+export const POST = handleRoute(async (request: NextRequest) => {
+  const session = await requireSession()
+  if (!session) return apiError('Não autorizado', 401)
 
-  const body = await request.json()
-  const { audioId, nosIds = [], gruposIds = [], dataHora, recorrente = false, cron } = body
-
-  if (!audioId) return NextResponse.json({ error: 'audioId obrigatório' }, { status: 400 })
-  if (!dataHora) return NextResponse.json({ error: 'dataHora obrigatório' }, { status: 400 })
-  if (nosIds.length === 0 && gruposIds.length === 0) {
-    return NextResponse.json({ error: 'Selecione ao menos um nó ou grupo' }, { status: 400 })
-  }
+  const parsed = await parseBody(request, agendamentoCreateSchema)
+  if (parsed.error) return parsed.error
+  const { audioId, nosIds, gruposIds, dataHora, recorrente, cron } = parsed.data
 
   await connectDB()
   const agendamento = await AgendamentoModel.create({
@@ -49,4 +44,4 @@ export async function POST(request: NextRequest) {
     .catch(err => console.error('[agendamentos] sync error:', err))
 
   return NextResponse.json(agendamento, { status: 201 })
-}
+})

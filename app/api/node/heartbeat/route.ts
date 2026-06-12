@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import NoModel from '@/models/No'
-import type { NodeHeartbeatPayload } from '@/types'
+import { verificarNodeKey } from '@/lib/node-auth'
+import { apiError, handleRoute, parseBody } from '@/lib/api-utils'
+import { nodeHeartbeatSchema } from '@/lib/validators'
 
-function verificarNodeKey(request: NextRequest): boolean {
-  return request.headers.get('x-node-key') === process.env.NODE_API_KEY
-}
+export const POST = handleRoute(async (request: NextRequest) => {
+  if (!verificarNodeKey(request)) return apiError('Não autorizado', 401)
 
-export async function POST(request: NextRequest) {
-  if (!verificarNodeKey(request)) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-  }
-
-  const body: NodeHeartbeatPayload = await request.json()
-  const { macAddress, ip } = body
-
-  if (!macAddress) {
-    return NextResponse.json({ error: 'macAddress obrigatório' }, { status: 400 })
-  }
+  const parsed = await parseBody(request, nodeHeartbeatSchema)
+  if (parsed.error) return parsed.error
+  const { macAddress, ip } = parsed.data
 
   await connectDB()
-  const update: Record<string, unknown> = { online: true, ultimoHeartbeat: new Date() }
+  const update: { online: boolean; ultimoHeartbeat: Date; ip?: string } = {
+    online: true,
+    ultimoHeartbeat: new Date(),
+  }
   if (ip) update.ip = ip
 
   const no = await NoModel.findOneAndUpdate({ macAddress }, update, { new: true })
-  if (!no) return NextResponse.json({ error: 'Nó não registrado' }, { status: 404 })
+  if (!no) return apiError('Nó não registrado', 404)
 
   return NextResponse.json({ success: true })
-}
+})

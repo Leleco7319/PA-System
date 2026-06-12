@@ -2,62 +2,35 @@ import NoModel from '@/models/No'
 import GrupoModel from '@/models/Grupo'
 import AgendamentoModel from '@/models/Agendamento'
 import type { IAgendamento, IAudio, IGrupo, INo } from '@/types'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface EspScheduleEntry {
-  hour: number
-  minute: number
-  days: number     // bitmask: bit0=Sun … bit6=Sat (0x7F = every day)
-  filename: string
-}
+import { agendamentoToEspEntry, type EspScheduleEntry } from '@/lib/espSchedule'
 
 type PopulatedAgendamento = Omit<IAgendamento, 'audio'> & { audio: IAudio }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Converts a cron day-of-week field (e.g. "*", "1,5", "1-5") to the ESP32
- * bitmask where bit0=Sunday, bit1=Monday … bit6=Saturday.
- * Cron uses 0=Sun…6=Sat (7 is also treated as Sun).
+ * Expands nosIds + gruposIds into a de-duplicated list of node documents
+ * (direct targets + members of the targeted groups).
  */
-function cronDaysToBitmask(field: string): number {
-  if (field === '*') return 0x7f
-  let mask = 0
-  for (const part of field.split(',')) {
-    if (part.includes('-')) {
-      const [start, end] = part.split('-').map(Number)
-      for (let d = start; d <= end; d++) mask |= 1 << (d % 7)
-    } else {
-      mask |= 1 << (Number(part) % 7)
+export async function resolveNodes(nosIds: string[], gruposIds: string[]): Promise<INo[]> {
+  const byId = new Map<string, INo>()
+
+  if (nosIds.length > 0) {
+    const diretos = await NoModel.find({ _id: { $in: nosIds } }).lean<INo[]>()
+    for (const no of diretos) byId.set(String(no._id), no)
+  }
+
+  if (gruposIds.length > 0) {
+    const grupos = await GrupoModel.find({ _id: { $in: gruposIds } })
+      .populate<{ nos: INo[] }>('nos')
+      .lean<(Omit<IGrupo, 'nos'> & { nos: INo[] })[]>()
+    for (const g of grupos) {
+      for (const no of g.nos) byId.set(String(no._id), no)
     }
   }
-  return mask
+
+  return Array.from(byId.values())
 }
-
-function agendamentoToEspEntry(ag: PopulatedAgendamento): EspScheduleEntry | null {
-  if (!ag.audio?.nomeArquivo) return null
-
-  if (ag.recorrente && ag.cron) {
-    const parts = ag.cron.trim().split(/\s+/)
-    if (parts.length < 5) return null
-    const minute = parseInt(parts[0], 10)
-    const hour = parseInt(parts[1], 10)
-    if (isNaN(hour) || isNaN(minute)) return null
-    return { hour, minute, days: cronDaysToBitmask(parts[4]), filename: ag.audio.nomeArquivo }
-  }
-
-  // One-time: fire only on the specific weekday of dataHora
-  const d = new Date(ag.dataHora)
-  return {
-    hour: d.getHours(),
-    minute: d.getMinutes(),
-    days: 1 << d.getDay(), // 0=Sun…6=Sat maps directly to bit position
-    filename: ag.audio.nomeArquivo,
-  }
-}
-
-// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Expands nosIds + gruposIds into a de-duplicated list of node ID strings.
@@ -65,18 +38,8 @@ function agendamentoToEspEntry(ag: PopulatedAgendamento): EspScheduleEntry | nul
  * syncNodeSchedules after the save.
  */
 export async function resolveNodeIds(nosIds: string[], gruposIds: string[]): Promise<string[]> {
-  const ids = new Set<string>(nosIds)
-
-  if (gruposIds.length > 0) {
-    const groups = await GrupoModel.find({ _id: { $in: gruposIds } })
-      .select('nos')
-      .lean<Pick<IGrupo, 'nos'>[]>()
-    for (const g of groups) {
-      for (const nId of g.nos) ids.add(nId.toString())
-    }
-  }
-
-  return Array.from(ids)
+  const nodes = await resolveNodes(nosIds, gruposIds)
+  return nodes.map((n) => String(n._id))
 }
 
 /**

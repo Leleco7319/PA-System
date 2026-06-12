@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import AudioModel from '@/models/Audio'
+import { verificarNodeKey } from '@/lib/node-auth'
+import { apiError, handleRoute } from '@/lib/api-utils'
 
-function verificarNodeKey(request: NextRequest): boolean {
-  return request.headers.get('x-node-key') === process.env.NODE_API_KEY
-}
-
-export async function GET(request: NextRequest) {
-  if (!verificarNodeKey(request)) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-  }
+export const GET = handleRoute(async (request: NextRequest) => {
+  if (!verificarNodeKey(request)) return apiError('Não autorizado', 401)
 
   await connectDB()
   const audios = await AudioModel.find({}, 'nomeArquivo checksum tamanho').lean()
@@ -21,4 +17,4 @@ export async function GET(request: NextRequest) {
   }))
 
   return NextResponse.json({ files })
-}
+})

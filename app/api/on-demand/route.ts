@@ -1,42 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { connectDB } from '@/lib/db'
-import NoModel from '@/models/No'
-import GrupoModel from '@/models/Grupo'
 import AudioModel from '@/models/Audio'
+import { resolveNodes } from '@/lib/scheduleSync'
+import { apiError, handleRoute, parseBody, requireSession } from '@/lib/api-utils'
+import { onDemandSchema } from '@/lib/validators'
+import { env } from '@/lib/env'
 import { unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+export const POST = handleRoute(async (request: NextRequest) => {
+  const session = await requireSession()
+  if (!session) return apiError('Não autorizado', 401)
 
-  const body = await request.json()
-  const { audioId, nosIds = [], gruposIds = [] } = body as {
-    audioId: string
-    nosIds: string[]
-    gruposIds: string[]
-  }
-
-  if (!audioId) return NextResponse.json({ error: 'audioId obrigatório' }, { status: 400 })
-  if (nosIds.length === 0 && gruposIds.length === 0) {
-    return NextResponse.json({ error: 'Selecione ao menos um nó ou grupo' }, { status: 400 })
-  }
+  const parsed = await parseBody(request, onDemandSchema)
+  if (parsed.error) return parsed.error
+  const { audioId, nosIds, gruposIds } = parsed.data
 
   await connectDB()
 
   const audio = await AudioModel.findById(audioId).lean()
-  if (!audio) return NextResponse.json({ error: 'Áudio não encontrado' }, { status: 404 })
+  if (!audio) return apiError('Áudio não encontrado', 404)
 
-  // Resolve target nodes (direct + via groups)
-  const nosDirectos = await NoModel.find({ _id: { $in: nosIds } }).lean()
-  const grupos = await GrupoModel.find({ _id: { $in: gruposIds } }).populate('nos').lean()
-  const nosViaGrupos = grupos.flatMap((g) => g.nos as typeof nosDirectos)
-  const nosUnicos = Array.from(
-    new Map([...nosDirectos, ...nosViaGrupos].map((n) => [String(n._id), n])).values()
-  )
+  // Resolve target nodes (direct + via groups, de-duplicated)
+  const nosUnicos = await resolveNodes(nosIds, gruposIds)
 
   // Always sync first — /sync on the firmware is synchronous, so this blocks
   // until each node has downloaded all pending files (including this audio).
@@ -70,10 +57,10 @@ export async function POST(request: NextRequest) {
   // Recorded audio: clean up from DB and disk now that every node received /play.
   // The firmware's orphan-cleanup pass will delete the file from SD on the next sync.
   if (audio.temporario) {
-    const filePath = path.join(process.cwd(), 'public', 'uploads', audio.nomeArquivo)
+    const filePath = path.join(env.UPLOAD_DIR, audio.nomeArquivo)
     if (existsSync(filePath)) await unlink(filePath).catch(() => {})
     await AudioModel.findByIdAndDelete(audioId)
   }
 
   return NextResponse.json({ resultados })
-}
+})
