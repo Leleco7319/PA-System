@@ -10,14 +10,14 @@ export const POST = handleRoute(async (request: NextRequest) => {
 
   const parsed = await parseBody(request, nodeStatusSchema)
   if (parsed.error) return parsed.error
-  const { macAddress, arquivo, status, mensagem } = parsed.data
+  const { macAddress, filename, status, message } = parsed.data
 
   await connectDB()
   const no = await NoModel.findOne({ macAddress })
   if (!no) return apiError('Nó não registrado', 404)
 
   // Log apenas — expansão futura pode gravar histórico de reprodução
-  console.log(`[status] Nó ${macAddress} | ${arquivo} | ${status}${mensagem ? ` | ${mensagem}` : ''}`)
+  console.log(`[status] Nó ${macAddress} | ${filename} | ${status}${message ? ` | ${message}` : ''}`)
 
   return NextResponse.json({ success: true })
 })

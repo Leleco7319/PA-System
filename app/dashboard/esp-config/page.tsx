@@ -75,15 +75,20 @@ export default function EspConfigPage() {
     }
   }
 
+  const previewFields: Record<string, string | number> = {
+    wifiSSID: config.wifiSSID,
+    wifiPassword: config.wifiPassword,
+    hostname: config.hostname,
+    volume: config.volume,
+    ServerURL: config.ServerURL,
+    apiToken: config.apiToken,
+  }
   const previewPayload = JSON.stringify(
-    {
-      wifiSSID: config.wifiSSID,
-      wifiPassword: config.wifiPassword,
-      hostname: config.hostname,
-      volume: Number(config.volume) || 0,
-      ServerURL: config.ServerURL,
-      apiToken: config.apiToken,
-    },
+    Object.fromEntries(
+      Object.entries(previewFields)
+        .filter(([, value]) => value !== '')
+        .map(([key, value]) => [key, key === 'volume' ? Number(value) : value])
+    ),
     null,
     2
   )

@@ -51,6 +51,24 @@ export function converterParaMp3(inputPath: string, outputPath: string): Promise
   })
 }
 
+/**
+ * Converte para WAV PCM 16-bit, mono, 16 kHz. O ESP32 sem PSRAM não consegue
+ * alocar os buffers contíguos do decoder de MP3 (~29 KB), mas reproduz WAV com
+ * pouquíssima RAM — por isso o on-demand (reprodução imediata) usa este formato.
+ */
+export function converterParaWav(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioCodec('pcm_s16le')
+      .audioFrequency(16000)
+      .audioChannels(1)
+      .toFormat('wav')
+      .on('end', () => resolve())
+      .on('error', (err) => reject(err))
+      .save(outputPath)
+  })
+}
+
 export interface UploadResult {
   nomeArquivo: string
   tamanho: number
@@ -58,13 +76,16 @@ export interface UploadResult {
 }
 
 /**
- * Valida, converte (webm→mp3) e grava o arquivo em UPLOAD_DIR.
- * `prefixoTmp` gera nome `tmp-{uuid}.{ext}` (áudios on-demand descartáveis).
+ * Valida, converte e grava o arquivo em UPLOAD_DIR.
+ * - `prefixoTmp` gera nome `tmp-{uuid}.{ext}` (áudios on-demand descartáveis).
+ * - `formato: 'wav'` transcodifica qualquer entrada para WAV PCM 16-bit (usado
+ *   no on-demand, pois o ESP32 sem PSRAM não toca MP3 por falta de RAM contígua).
+ *   Sem essa opção, webm é convertido para mp3 e os demais formatos mantidos.
  * Lança UploadError (400) para falhas de validação.
  */
 export async function processarUpload(
   arquivo: File,
-  opts: { prefixoTmp?: boolean } = {}
+  opts: { prefixoTmp?: boolean; formato?: 'wav' } = {}
 ): Promise<UploadResult> {
   const ext = extrairExtensao(arquivo.name)
   if (!validarExtensao(ext)) {
@@ -81,7 +102,19 @@ export async function processarUpload(
   let finalBuffer = buffer
   let finalExt = ext
 
-  if (ext === 'webm') {
+  if (opts.formato === 'wav') {
+    const tmpPath = path.join(env.UPLOAD_DIR, `tmp-${uuidv4()}.${ext}`)
+    const wavPath = path.join(env.UPLOAD_DIR, `tmp-${uuidv4()}.wav`)
+    try {
+      await writeFile(tmpPath, buffer)
+      await converterParaWav(tmpPath, wavPath)
+      finalBuffer = await readFile(wavPath)
+      finalExt = 'wav'
+    } finally {
+      await unlink(tmpPath).catch(() => {})
+      await unlink(wavPath).catch(() => {})
+    }
+  } else if (ext === 'webm') {
     const tmpPath = path.join(env.UPLOAD_DIR, `tmp-${uuidv4()}.webm`)
     const mp3Path = path.join(env.UPLOAD_DIR, `tmp-${uuidv4()}.mp3`)
     try {

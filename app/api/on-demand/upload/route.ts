@@ -13,7 +13,10 @@ export const POST = handleRoute(async (request: NextRequest) => {
   if (!arquivo) return apiError('Arquivo não enviado', 400)
 
   try {
-    const { nomeArquivo, tamanho, checksum } = await processarUpload(arquivo, { prefixoTmp: true })
+    const { nomeArquivo, tamanho, checksum } = await processarUpload(arquivo, {
+      prefixoTmp: true,
+      formato: 'wav', // ESP32 sem PSRAM não toca MP3 (falta RAM contígua p/ o decoder)
+    })
 
     // Save to DB as temporario — invisible in the library, deleted right after play
     await connectDB()

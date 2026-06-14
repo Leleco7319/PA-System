@@ -10,15 +10,15 @@ export const POST = handleRoute(async (request: NextRequest) => {
 
   const parsed = await parseBody(request, nodeRegisterSchema)
   if (parsed.error) return parsed.error
-  const { macAddress, ip, versaoFirmware, nome } = parsed.data
+  const { macAddress, ip, firmwareVersion, name } = parsed.data
 
   await connectDB()
   const no = await NoModel.findOneAndUpdate(
     { macAddress },
     {
       ip,
-      versaoFirmware: versaoFirmware ?? '',
-      nome: nome ?? macAddress,
+      versaoFirmware: firmwareVersion ?? '',
+      nome: name ?? macAddress,
       online: true,
       ultimoHeartbeat: new Date(),
     },

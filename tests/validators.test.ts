@@ -191,10 +191,10 @@ describe('schemas de /api/node/*', () => {
     expect(nodeHeartbeatSchema.safeParse({}).success).toBe(false)
   })
 
-  it('nodeStatusSchema exige macAddress, arquivo e status', () => {
+  it('nodeStatusSchema exige macAddress, filename e status', () => {
     expect(
-      nodeStatusSchema.safeParse({ macAddress: 'AA:BB', arquivo: 'x.mp3', status: 'reproduzindo' }).success
+      nodeStatusSchema.safeParse({ macAddress: 'AA:BB', filename: 'x.mp3', status: 'reproduzindo' }).success
     ).toBe(true)
-    expect(nodeStatusSchema.safeParse({ macAddress: 'AA:BB', arquivo: 'x.mp3' }).success).toBe(false)
+    expect(nodeStatusSchema.safeParse({ macAddress: 'AA:BB', filename: 'x.mp3' }).success).toBe(false)
   })
 })

@@ -81,9 +81,9 @@ describe('POST /api/audios', () => {
     expect(res.status).toBe(400)
   })
 
-  it('201 happy path persiste metadados', async () => {
+  it('201 happy path persiste metadados (convertido para WAV)', async () => {
     ;(processarUpload as ReturnType<typeof vi.fn>).mockResolvedValue({
-      nomeArquivo: 'uuid.mp3',
+      nomeArquivo: 'uuid.wav',
       tamanho: 3,
       checksum: 'abc',
     })
@@ -91,8 +91,10 @@ describe('POST /api/audios', () => {
     const file = new File(['abc'], 'a.mp3', { type: 'audio/mpeg' })
     const res = await POST(uploadRequest({ arquivo: file, nome: 'x' }))
     expect(res.status).toBe(201)
+    // todo upload da biblioteca é transcodificado para WAV
+    expect(processarUpload).toHaveBeenCalledWith(expect.any(File), { formato: 'wav' })
     expect(AudioModel.create).toHaveBeenCalledWith(
-      expect.objectContaining({ nome: 'x', nomeArquivo: 'uuid.mp3', checksum: 'abc' })
+      expect.objectContaining({ nome: 'x', nomeArquivo: 'uuid.wav', checksum: 'abc' })
     )
   })
 })

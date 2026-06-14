@@ -50,7 +50,7 @@ describe('POST /api/node/register', () => {
   it('200 e retorna noId no happy path (shape do firmware)', async () => {
     ;(NoModel.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({ _id: 'no123' })
     const res = await registerPOST(
-      jsonRequest('/api/node/register', 'POST', { macAddress: 'AA:BB', ip: '1.1.1.1', versaoFirmware: '1.0' }, KEY_HEADER)
+      jsonRequest('/api/node/register', 'POST', { macAddress: 'AA:BB', ip: '1.1.1.1', firmwareVersion: '1.0' }, KEY_HEADER)
     )
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ success: true, noId: 'no123' })
@@ -114,7 +114,7 @@ describe('POST /api/node/status', () => {
   it('404 quando o nó não existe', async () => {
     ;(NoModel.findOne as ReturnType<typeof vi.fn>).mockResolvedValue(null)
     const res = await statusPOST(
-      jsonRequest('/api/node/status', 'POST', { macAddress: 'AA', arquivo: 'a.mp3', status: 'concluido' }, KEY_HEADER)
+      jsonRequest('/api/node/status', 'POST', { macAddress: 'AA', filename: 'a.mp3', status: 'concluido' }, KEY_HEADER)
     )
     expect(res.status).toBe(404)
   })
@@ -122,7 +122,7 @@ describe('POST /api/node/status', () => {
   it('200 happy path', async () => {
     ;(NoModel.findOne as ReturnType<typeof vi.fn>).mockResolvedValue({ _id: 'x' })
     const res = await statusPOST(
-      jsonRequest('/api/node/status', 'POST', { macAddress: 'AA', arquivo: 'a.mp3', status: 'reproduzindo' }, KEY_HEADER)
+      jsonRequest('/api/node/status', 'POST', { macAddress: 'AA', filename: 'a.mp3', status: 'reproduzindo' }, KEY_HEADER)
     )
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ success: true })

@@ -11,16 +11,14 @@ export const POST = handleRoute(async (request: NextRequest) => {
 
   const parsed = await parseBody(request, espConfigSchema)
   if (parsed.error) return parsed.error
-  const { ip, port, wifiSSID, wifiPassword, hostname, volume, ServerURL, apiToken } = parsed.data
+  const { ip, port, ...config } = parsed.data
 
-  const payload = JSON.stringify({
-    wifiSSID,
-    wifiPassword,
-    hostname,
-    volume,
-    ServerURL,
-    apiToken,
-  })
+  // Só envia ao ESP os campos efetivamente preenchidos (nunca string vazia).
+  const filled = Object.fromEntries(
+    Object.entries(config).filter(([, value]) => value !== undefined && value !== '')
+  )
+
+  const payload = JSON.stringify(filled)
 
   const buffer = Buffer.from(payload, 'utf8')
 

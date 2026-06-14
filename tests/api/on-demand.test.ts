@@ -6,7 +6,7 @@ vi.mock('next-auth/next', () => ({ getServerSession: vi.fn() }))
 vi.mock('@/lib/auth', () => ({ authOptions: {} }))
 vi.mock('@/lib/db', () => ({ connectDB: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/models/Audio', () => ({
-  default: { findById: vi.fn(), create: vi.fn(), findByIdAndDelete: vi.fn() },
+  default: { findById: vi.fn(), find: vi.fn(), create: vi.fn(), findByIdAndDelete: vi.fn(), deleteMany: vi.fn() },
 }))
 vi.mock('@/lib/scheduleSync', () => ({ resolveNodes: vi.fn() }))
 vi.mock('@/lib/audio-upload', () => ({
@@ -36,6 +36,8 @@ const OID2 = '507f1f77bcf86cd799439012'
 beforeEach(() => {
   vi.clearAllMocks()
   session.mockResolvedValue({ user: {} } as never)
+  // Default da varredura de temporários: nada expirado (testes sobrescrevem quando preciso)
+  ;(AudioModel.find as ReturnType<typeof vi.fn>).mockReturnValue({ lean: vi.fn().mockResolvedValue([]) })
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -73,15 +75,33 @@ describe('POST /api/on-demand', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('remove áudio temporário após reproduzir', async () => {
+  it('NÃO apaga o áudio temporário recém-reproduzido (evita 404 no download do ESP)', async () => {
     ;(AudioModel.findById as ReturnType<typeof vi.fn>).mockReturnValue({
       lean: vi.fn().mockResolvedValue({ _id: OID, nomeArquivo: 'tmp.mp3', temporario: true }),
     })
+    // varredura: nenhum temporário expirado
+    ;(AudioModel.find as ReturnType<typeof vi.fn>).mockReturnValue({ lean: vi.fn().mockResolvedValue([]) })
     ;(resolveNodes as ReturnType<typeof vi.fn>).mockResolvedValue([{ _id: 'n1', ip: '1.1.1.1' }])
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
 
     await onDemandPOST(jsonRequest('/api/on-demand', 'POST', { audioId: OID, nosIds: [OID2] }))
-    expect(AudioModel.findByIdAndDelete).toHaveBeenCalledWith(OID)
+    expect(AudioModel.findByIdAndDelete).not.toHaveBeenCalled()
+    expect(AudioModel.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('varre temporários expirados (disco + DB) após reproduzir', async () => {
+    ;(AudioModel.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue({ _id: OID, nomeArquivo: 'a.mp3', temporario: false }),
+    })
+    ;(AudioModel.find as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue([{ _id: 'velho1', nomeArquivo: 'tmp-velho.mp3' }]),
+    })
+    ;(AudioModel.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({})
+    ;(resolveNodes as ReturnType<typeof vi.fn>).mockResolvedValue([{ _id: 'n1', ip: '1.1.1.1' }])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
+
+    await onDemandPOST(jsonRequest('/api/on-demand', 'POST', { audioId: OID, nosIds: [OID2] }))
+    expect(AudioModel.deleteMany).toHaveBeenCalledWith({ _id: { $in: ['velho1'] } })
   })
 })
 
@@ -108,7 +128,7 @@ describe('POST /api/on-demand/upload', () => {
     const res = await uploadPOST(uploadRequest(file))
     expect(res.status).toBe(201)
     expect(await res.json()).toEqual({ audioId: 'aud1' })
-    // FormData recria o File, então validamos só as opções (prefixoTmp)
-    expect(processarUpload).toHaveBeenCalledWith(expect.any(File), { prefixoTmp: true })
+    // FormData recria o File, então validamos só as opções (prefixoTmp + formato wav)
+    expect(processarUpload).toHaveBeenCalledWith(expect.any(File), { prefixoTmp: true, formato: 'wav' })
   })
 })

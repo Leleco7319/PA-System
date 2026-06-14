@@ -26,7 +26,9 @@ export const POST = handleRoute(async (request: NextRequest) => {
   if (!nome?.trim()) return apiError('Nome obrigatório', 400)
 
   try {
-    const { nomeArquivo, tamanho, checksum } = await processarUpload(arquivo)
+    // Todo áudio é gravado em WAV: o ESP32 sem PSRAM não toca MP3 (falta RAM
+    // contígua p/ o decoder), mas reproduz WAV PCM com pouquíssima memória.
+    const { nomeArquivo, tamanho, checksum } = await processarUpload(arquivo, { formato: 'wav' })
 
     await connectDB()
     const audio = await AudioModel.create({

@@ -92,12 +92,12 @@ export const onDemandSchema = z
 export const espConfigSchema = z.object({
   ip: z.string().refine(isValidIp, 'IP inválido'),
   port: z.coerce.number().int().min(1, 'Porta inválida (1–65535)').max(65535, 'Porta inválida (1–65535)'),
-  wifiSSID: z.string().default(''),
-  wifiPassword: z.string().default(''),
-  hostname: z.string().default(''),
-  volume: z.coerce.number().int().min(0, 'Volume inválido (0–100)').max(100, 'Volume inválido (0–100)'),
-  ServerURL: z.string().default(''),
-  apiToken: z.string().default(''),
+  wifiSSID: z.string().optional(),
+  wifiPassword: z.string().optional(),
+  hostname: z.string().optional(),
+  volume: z.coerce.number().int().min(0, 'Volume inválido (0–100)').max(100, 'Volume inválido (0–100)').optional(),
+  ServerURL: z.string().optional(),
+  apiToken: z.string().optional(),
 })
 
 // ─── Rotas /api/node/* (payloads dos ESP32) ───────────────────────────────────
@@ -107,8 +107,8 @@ export const espConfigSchema = z.object({
 export const nodeRegisterSchema = z.object({
   macAddress: z.string().min(1, 'macAddress e ip são obrigatórios'),
   ip: z.string().min(1, 'macAddress e ip são obrigatórios'),
-  versaoFirmware: z.string().optional(),
-  nome: z.string().optional(),
+  firmwareVersion: z.string().optional(),
+  name: z.string().optional(),
 })
 
 export const nodeHeartbeatSchema = z.object({
@@ -118,7 +118,7 @@ export const nodeHeartbeatSchema = z.object({
 
 export const nodeStatusSchema = z.object({
   macAddress: z.string().min(1, 'macAddress obrigatório'),
-  arquivo: z.string().min(1, 'arquivo obrigatório'),
+  filename: z.string().min(1, 'filename obrigatório'),
   status: z.string().min(1, 'status obrigatório'),
-  mensagem: z.string().optional(),
+  message: z.string().optional(),
 })
