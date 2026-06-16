@@ -28,6 +28,19 @@ export function formatDateTime(date: Date | string): string {
   })
 }
 
+/**
+ * Gera expressão cron semanal ("mm hh * * dias") no formato consumido pelo
+ * firmware ESP32 (0=Dom…6=Sáb). Retorna null se nenhum dia for selecionado.
+ */
+export function gerarCron(diasSelecionados: number[], horario: string): string | null {
+  if (diasSelecionados.length === 0) return null
+  const [hh, mm] = horario.split(':')
+  const dias = diasSelecionados.length === 7
+    ? '*'
+    : [...diasSelecionados].sort((a, b) => a - b).join(',')
+  return `${mm ?? '0'} ${hh ?? '0'} * * ${dias}`
+}
+
 export function slugify(text: string): string {
   return text
     .toLowerCase()

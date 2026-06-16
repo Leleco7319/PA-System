@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
-import Modal from '@/components/ui/Modal'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 import Spinner from '@/components/ui/Spinner'
 import { formatBytes, formatDuration } from '@/lib/utils'
 import type { IAudioJSON } from '@/types'
@@ -76,19 +76,14 @@ export default function AudioList({ audios, loading, onDelete }: AudioListProps)
         </table>
       </div>
 
-      <Modal
+      <ConfirmModal
         open={!!confirmId}
-        onClose={() => setConfirmId(null)}
         title="Remover áudio"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirmId(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={handleDelete} loading={deleting}>Remover</Button>
-          </>
-        }
-      >
-        <p className="text-gray-600">Tem certeza que deseja remover este áudio? O arquivo será excluído permanentemente.</p>
-      </Modal>
+        message="Tem certeza que deseja remover este áudio? O arquivo será excluído permanentemente."
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmId(null)}
+      />
     </>
   )
 }

@@ -1,10 +1,5 @@
 import mongoose from 'mongoose'
-
-const MONGODB_URI = process.env.MONGODB_URI as string
-
-if (!MONGODB_URI) {
-  throw new Error('Defina a variável MONGODB_URI no .env.local')
-}
+import { env } from '@/lib/env'
 
 interface MongooseCache {
   conn: typeof mongoose | null
@@ -12,7 +7,6 @@ interface MongooseCache {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var mongooseCache: MongooseCache | undefined
 }
 
@@ -23,11 +17,18 @@ export async function connectDB(): Promise<typeof mongoose> {
   if (cached.conn) return cached.conn
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
+    cached.promise = mongoose.connect(env.MONGODB_URI, {
       bufferCommands: false,
     })
   }
 
-  cached.conn = await cached.promise
+  try {
+    cached.conn = await cached.promise
+  } catch (err) {
+    // Descarta a promise rejeitada para permitir nova tentativa de conexão
+    cached.promise = null
+    throw err
+  }
+
   return cached.conn
 }

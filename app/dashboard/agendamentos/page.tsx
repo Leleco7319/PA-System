@@ -1,31 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import Header from '@/components/layout/Header'
 import AgendamentoList from '@/components/agendamentos/AgendamentoList'
 import AgendamentoForm from '@/components/agendamentos/AgendamentoForm'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
+import ErrorBanner from '@/components/ui/ErrorBanner'
+import useApiList from '@/hooks/useApiList'
 import type { IAgendamentoJSON } from '@/types'
 
 export default function AgendamentosPage() {
-  const [agendamentos, setAgendamentos] = useState<IAgendamentoJSON[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: agendamentos, loading, error, refetch } = useApiList<IAgendamentoJSON>('/api/agendamentos')
   const [modalOpen, setModalOpen] = useState(false)
-
-  const fetchAgendamentos = useCallback(async () => {
-    setLoading(true)
-    const res = await fetch('/api/agendamentos')
-    const data = await res.json()
-    setAgendamentos(data)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { fetchAgendamentos() }, [fetchAgendamentos])
 
   async function handleDelete(id: string) {
     await fetch(`/api/agendamentos/${id}`, { method: 'DELETE' })
-    await fetchAgendamentos()
+    await refetch()
   }
 
   return (
@@ -42,6 +33,8 @@ export default function AgendamentosPage() {
           </Button>
         </div>
 
+        {error && <ErrorBanner message={`Erro ao carregar agendamentos: ${error}`} />}
+
         <AgendamentoList agendamentos={agendamentos} loading={loading} onDelete={handleDelete} />
       </div>
 
@@ -49,7 +42,7 @@ export default function AgendamentosPage() {
         <AgendamentoForm
           onSuccess={() => {
             setModalOpen(false)
-            fetchAgendamentos()
+            refetch()
           }}
         />
       </Modal>

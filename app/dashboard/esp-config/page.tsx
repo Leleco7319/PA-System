@@ -12,20 +12,18 @@ interface EspConfig {
   wifiPassword: string
   hostname: string
   volume: string
-  mqttBroker: string
-  mqttPort: string
+  ServerURL: string
   apiToken: string
 }
 
 const DEFAULT_CONFIG: EspConfig = {
   ip: '',
-  port: '5005',
-  wifiSSID: 'VIVO LECO',
-  wifiPassword: 'Piriquito120203',
-  hostname: 'alarm-1',
+  port: '8000',
+  wifiSSID: '',
+  wifiPassword: '',
+  hostname: '',
   volume: '10',
-  mqttBroker: '192.168.1.100',
-  mqttPort: '1883',
+  ServerURL: '',
   apiToken: '',
 }
 
@@ -47,20 +45,18 @@ export default function EspConfigPage() {
     setResult(null)
 
     try {
+      const payload = Object.entries(config).reduce(
+        (acc, [key, value]) => {
+          if (value) acc[key] = value
+          return acc
+        },
+        {} as Record<string, string>
+      )
+
       const res = await fetch('/api/esp-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ip: config.ip,
-          port: config.port,
-          wifiSSID: config.wifiSSID,
-          wifiPassword: config.wifiPassword,
-          hostname: config.hostname,
-          volume: config.volume,
-          mqttBroker: config.mqttBroker,
-          mqttPort: config.mqttPort,
-          apiToken: config.apiToken,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await res.json()
@@ -79,16 +75,20 @@ export default function EspConfigPage() {
     }
   }
 
+  const previewFields: Record<string, string | number> = {
+    wifiSSID: config.wifiSSID,
+    wifiPassword: config.wifiPassword,
+    hostname: config.hostname,
+    volume: config.volume,
+    ServerURL: config.ServerURL,
+    apiToken: config.apiToken,
+  }
   const previewPayload = JSON.stringify(
-    {
-      wifiSSID: config.wifiSSID,
-      wifiPassword: config.wifiPassword,
-      hostname: config.hostname,
-      volume: Number(config.volume) || 0,
-      mqttBroker: config.mqttBroker,
-      mqttPort: Number(config.mqttPort) || 0,
-      apiToken: config.apiToken,
-    },
+    Object.fromEntries(
+      Object.entries(previewFields)
+        .filter(([, value]) => value !== '')
+        .map(([key, value]) => [key, key === 'volume' ? Number(value) : value])
+    ),
     null,
     2
   )
@@ -127,12 +127,14 @@ export default function EspConfigPage() {
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="SSID"
+                placeholder="Nome da rede Wi-Fi"
                 value={config.wifiSSID}
                 onChange={handleChange('wifiSSID')}
               />
               <Input
                 label="Senha"
                 type="password"
+                placeholder="Senha da rede Wi-Fi"
                 value={config.wifiPassword}
                 onChange={handleChange('wifiPassword')}
               />
@@ -145,6 +147,7 @@ export default function EspConfigPage() {
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Hostname"
+                placeholder="alarm-1"
                 value={config.hostname}
                 onChange={handleChange('hostname')}
               />
@@ -159,22 +162,15 @@ export default function EspConfigPage() {
             </div>
           </div>
 
-          {/* MQTT */}
+          {/* Server URL */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-            <h2 className="font-semibold text-gray-700">MQTT Broker</h2>
+            <h2 className="font-semibold text-gray-700">Server URL</h2>
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Broker IP"
-                value={config.mqttBroker}
-                onChange={handleChange('mqttBroker')}
-              />
-              <Input
-                label="Porta MQTT"
-                type="number"
-                min={1}
-                max={65535}
-                value={config.mqttPort}
-                onChange={handleChange('mqttPort')}
+                label="Server URL"
+                placeholder="http://192.168.1.x:3000"
+                value={config.ServerURL}
+                onChange={handleChange('ServerURL')}
               />
             </div>
           </div>

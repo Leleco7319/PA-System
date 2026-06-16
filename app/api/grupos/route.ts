@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { connectDB } from '@/lib/db'
 import GrupoModel from '@/models/Grupo'
+import { apiError, handleRoute, parseBody, requireSession } from '@/lib/api-utils'
+import { grupoCreateSchema } from '@/lib/validators'
 
-export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+export const GET = handleRoute(async () => {
+  const session = await requireSession()
+  if (!session) return apiError('Não autorizado', 401)
 
   await connectDB()
   const grupos = await GrupoModel.find()
@@ -14,18 +14,17 @@ export async function GET() {
     .sort({ nome: 1 })
     .lean()
   return NextResponse.json(grupos)
-}
+})
 
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+export const POST = handleRoute(async (request: NextRequest) => {
+  const session = await requireSession()
+  if (!session) return apiError('Não autorizado', 401)
 
-  const body = await request.json()
-  const { nome, descricao = '', nosIds = [] } = body
-
-  if (!nome?.trim()) return NextResponse.json({ error: 'Nome obrigatório' }, { status: 400 })
+  const parsed = await parseBody(request, grupoCreateSchema)
+  if (parsed.error) return parsed.error
+  const { nome, descricao, nosIds } = parsed.data
 
   await connectDB()
-  const grupo = await GrupoModel.create({ nome: nome.trim(), descricao, nos: nosIds })
+  const grupo = await GrupoModel.create({ nome, descricao, nos: nosIds })
   return NextResponse.json(grupo, { status: 201 })
-}
+})

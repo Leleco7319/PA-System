@@ -1,18 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Header from '@/components/layout/Header'
 import SeletorNos from '@/components/on-demand/SeletorNos'
 import GravacaoAudio from '@/components/on-demand/GravacaoAudio'
 import Button from '@/components/ui/Button'
+import ErrorBanner from '@/components/ui/ErrorBanner'
+import useApiList from '@/hooks/useApiList'
 import type { IAudioJSON, INoJSON, IGrupoJSON } from '@/types'
 
 interface Resultado { noId: string; ip: string; sucesso: boolean; erro?: string }
 
 export default function OnDemandPage() {
-  const [audios, setAudios] = useState<IAudioJSON[]>([])
-  const [nos, setNos] = useState<INoJSON[]>([])
-  const [grupos, setGrupos] = useState<IGrupoJSON[]>([])
+  const { data: audios, error: audiosError } = useApiList<IAudioJSON>('/api/audios')
+  const { data: nos, error: nosError } = useApiList<INoJSON>('/api/nos')
+  const { data: grupos, error: gruposError } = useApiList<IGrupoJSON>('/api/grupos')
+  const fetchError = audiosError ?? nosError ?? gruposError
 
   const [audioId, setAudioId] = useState('')
   const [gravacaoLabel, setGravacaoLabel] = useState('')
@@ -22,14 +25,6 @@ export default function OnDemandPage() {
   const [uploadingGravacao, setUploadingGravacao] = useState(false)
   const [resultados, setResultados] = useState<Resultado[] | null>(null)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/audios').then(r => r.json()),
-      fetch('/api/nos').then(r => r.json()),
-      fetch('/api/grupos').then(r => r.json()),
-    ]).then(([a, n, g]) => { setAudios(a); setNos(n); setGrupos(g) })
-  }, [])
 
   async function handleTransmitir() {
     if (!audioId) { setError('Selecione ou grave um áudio'); return }
@@ -62,6 +57,8 @@ export default function OnDemandPage() {
     <div>
       <Header title="Reprodução On-Demand" />
       <div className="p-6 max-w-2xl space-y-6">
+        {fetchError && <ErrorBanner message={`Erro ao carregar dados: ${fetchError}`} />}
+
         <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
           <h2 className="font-semibold text-gray-700">Selecionar Áudio</h2>
           <select

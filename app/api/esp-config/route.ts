@@ -1,48 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import dgram from 'dgram'
+import { apiError, handleRoute, parseBody, requireSession } from '@/lib/api-utils'
+import { espConfigSchema } from '@/lib/validators'
 
 export const runtime = 'nodejs'
 
-const IP_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/
+export const POST = handleRoute(async (request: NextRequest) => {
+  const session = await requireSession()
+  if (!session) return apiError('Não autorizado', 401)
 
-function isValidIp(ip: string): boolean {
-  if (!IP_REGEX.test(ip)) return false
-  return ip.split('.').every((octet) => parseInt(octet, 10) <= 255)
-}
+  const parsed = await parseBody(request, espConfigSchema)
+  if (parsed.error) return parsed.error
+  const { ip, port, ...config } = parsed.data
 
-export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  // Só envia ao ESP os campos efetivamente preenchidos (nunca string vazia).
+  const filled = Object.fromEntries(
+    Object.entries(config).filter(([, value]) => value !== undefined && value !== '')
+  )
 
-  const body = await request.json()
-  const { ip, port, wifiSSID, wifiPassword, hostname, volume, mqttBroker, mqttPort, apiToken } = body
-
-  if (!ip || !isValidIp(ip)) {
-    return NextResponse.json({ error: 'IP inválido' }, { status: 400 })
-  }
-
-  const portNum = parseInt(port, 10)
-  if (!port || isNaN(portNum) || portNum < 1 || portNum > 65535) {
-    return NextResponse.json({ error: 'Porta inválida (1–65535)' }, { status: 400 })
-  }
-
-  const payload = JSON.stringify({
-    wifiSSID,
-    wifiPassword,
-    hostname,
-    volume: Number(volume),
-    mqttBroker,
-    mqttPort: Number(mqttPort),
-    apiToken,
-  })
+  const payload = JSON.stringify(filled)
 
   const buffer = Buffer.from(payload, 'utf8')
 
   await new Promise<void>((resolve, reject) => {
     const client = dgram.createSocket('udp4')
-    client.send(buffer, 0, buffer.length, portNum, ip, (err) => {
+    client.send(buffer, 0, buffer.length, port, ip, (err) => {
       client.close()
       if (err) reject(err)
       else resolve()
@@ -51,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    sentTo: `${ip}:${portNum}`,
+    sentTo: `${ip}:${port}`,
     bytes: buffer.length,
   })
-}
+})
